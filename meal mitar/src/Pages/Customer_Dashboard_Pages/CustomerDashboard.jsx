@@ -122,7 +122,7 @@ const tickerStyles = `
       {/* Stats Cards Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <button onClick={() => navigate('/dashboard/subscriptions')} className="text-left w-full block hover:scale-105 transition-transform">
-          <StatsCard title="Active Subscriptions" value={dashboardData?.subscription ? "1" : "0"} icon={<ShoppingCart size={24} className="text-orange-400" />} />
+          <StatsCard title="Active Subscriptions" value={String(dashboardData?.stats?.activeSubscriptions || 0)} icon={<ShoppingCart size={24} className="text-orange-400" />} />
         </button>
         <button onClick={() => navigate('/dashboard/orders')} className="text-left w-full block hover:scale-105 transition-transform">
           <StatsCard title="Total Orders" value={dashboardData?.stats?.totalOrders || "0"} icon={<Package size={24} className="text-green-400" />} />

@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react'; // Added useEffect
+import React, { useState, useEffect } from 'react';
 import { 
-  Users, IndianRupee, ChefHat, ClipboardList, Star, Calendar, UserPlus, MapPin,
-  Megaphone, PauseCircle, TrendingUp, ArrowRight,
-  CheckCircle, AlertCircle, Bell, ShoppingBag, Plus, Loader // Added Loader
+  Users, IndianRupee, ChefHat, ClipboardList, Star, Calendar, UserPlus, MapPin,ArrowRight,
+  Megaphone, PauseCircle, PhoneCall, Home,
+  CheckCircle, Loader 
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -10,8 +10,9 @@ const VendorDashboard = () => {
   const navigate = useNavigate(); 
   const [activeTab, setActiveTab] = useState('deliveries');
   
-  // --- NEW: DYNAMIC STATES ---
+  // --- DYNAMIC STATES ---
   const [dashboardData, setDashboardData] = useState(null);
+  const [deliveryData, setDeliveryData] = useState({ groupedList: {}, totalDeliveries: 0 });
   const [isLoading, setIsLoading] = useState(true);
 
   const currentDate = new Date().toLocaleDateString('en-IN', { 
@@ -20,7 +21,7 @@ const VendorDashboard = () => {
 
   // --- FETCH DATA ON LOAD ---
   useEffect(() => {
-    const fetchDashboard = async () => {
+    const fetchDashboardAndDeliveries = async () => {
       try {
         const token = localStorage.getItem('token');
         if (!token) {
@@ -28,15 +29,22 @@ const VendorDashboard = () => {
           return;
         }
 
-        const response = await fetch('http://localhost:5000/api/vendor/dashboard', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
+        // Fetch general dashboard stats
+        const dashRes = await fetch('http://localhost:5000/api/vendor/dashboard', {
+          headers: { 'Authorization': `Bearer ${token}` }
         });
 
-        if (response.ok) {
-          const data = await response.json();
-          setDashboardData(data);
+        // Fetch the smart delivery list
+        const deliveryRes = await fetch('http://localhost:5000/api/vendor/deliveries/today', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+
+        if (dashRes.ok && deliveryRes.ok) {
+          const dashData = await dashRes.json();
+          const delData = await deliveryRes.json();
+          
+          setDashboardData(dashData);
+          setDeliveryData(delData);
         } else {
           localStorage.removeItem('token');
           navigate('/login');
@@ -48,11 +56,16 @@ const VendorDashboard = () => {
       }
     };
 
-    fetchDashboard();
+    fetchDashboardAndDeliveries();
   }, [navigate]);
 
   if (isLoading) {
-    return <div className="flex flex-col items-center justify-center min-h-screen text-orange-600"><Loader className="animate-spin mb-4" size={48} /><p className="font-bold">Loading your kitchen...</p></div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen text-orange-600">
+        <Loader className="animate-spin mb-4" size={48} />
+        <p className="font-bold">Loading your kitchen...</p>
+      </div>
+    );
   }
 
   // Fallback to empty object if data is missing
@@ -90,16 +103,25 @@ const VendorDashboard = () => {
 
       {/* --- Stats Overview --- */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        <button onClick={() => navigate('/CustomerDirectory')} className="text-left">
-          <StatsCard title="Active Students" value={dashboardData?.stats?.activeSubscribers || "0"} subtext="Currently subscribed" icon={<Users size={24} className="text-blue-600" />} color="bg-blue-100" />
+        
+        {/* UPDATED: Changed Title and mapped to stats.totalCustomers */}
+        <button onClick={() => navigate('/CustomerDirectory')} className="text-left w-full">
+          <StatsCard 
+            title="Active Customers" 
+            value={dashboardData?.stats?.totalCustomers || "0"} 
+            subtext="Currently subscribed" 
+            icon={<Users size={24} className="text-blue-600" />} 
+            color="bg-blue-100" 
+          />
         </button>
-        <div className="text-left cursor-default">
-          <StatsCard title="Total Revenue" value={`₹${dashboardData?.stats?.monthlyRevenue || "0"}`} subtext="This Month" icon={<IndianRupee size={24} className="text-green-600" />} color="bg-green-100" />
-        </div>
-        <button onClick={() => navigate('/locations')} className="text-left">
-          <StatsCard title="Today's Deliveries" value={dashboardData?.stats?.todayDeliveries || "0"} subtext="Meals to prepare" icon={<ClipboardList size={24} className="text-orange-600" />} color="bg-orange-100" />
+
+       
+        
+        {/* ... Rest of the stats cards ... */}
+        <button onClick={() => navigate('/locations')} className="text-left w-full">
+          <StatsCard title="Today's Deliveries" value={deliveryData.totalDeliveries || "0"} subtext="Meals to prepare" icon={<ClipboardList size={24} className="text-orange-600" />} color="bg-orange-100" />
         </button>
-        <button onClick={() => navigate("/Reviews")} className="text-left">
+        <button onClick={() => navigate("/Reviews")} className="text-left w-full">
           <StatsCard title="Vendor Rating" value={business.rating || "New"} subtext="Customer Feedback" icon={<Star size={24} className="text-yellow-500 fill-yellow-500" />} color="bg-yellow-100" />
         </button>
       </div>
@@ -111,31 +133,81 @@ const VendorDashboard = () => {
         <div className="lg:col-span-2 space-y-6">
           
           {/* Tab Navigation */}
-          <div className="flex items-center gap-4 border-b border-gray-100 pb-1">
-            <button onClick={() => setActiveTab('deliveries')} className={`pb-3 text-sm font-bold flex items-center gap-2 transition-colors ${activeTab === 'deliveries' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-400 hover:text-gray-600'}`}>
-              <ClipboardList size={18} /> Delivery List
+          <div className="flex items-center gap-6 border-b border-gray-100 pb-2">
+            <button onClick={() => setActiveTab('deliveries')} className={`pb-3 text-sm font-bold flex items-center gap-2 transition-colors relative ${activeTab === 'deliveries' ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'}`}>
+              <ClipboardList size={18} /> Today's Deliveries ({deliveryData.totalDeliveries})
+              {activeTab === 'deliveries' && <div className="absolute bottom-[-2px] left-0 w-full h-0.5 bg-orange-600 rounded-t-full"></div>}
             </button>
-            <button onClick={() => setActiveTab('payments')} className={`pb-3 text-sm font-bold flex items-center gap-2 transition-colors ${activeTab === 'payments' ? 'text-orange-600 border-b-2 border-orange-600' : 'text-gray-400 hover:text-gray-600'}`}>
+            <button onClick={() => setActiveTab('payments')} className={`pb-3 text-sm font-bold flex items-center gap-2 transition-colors relative ${activeTab === 'payments' ? 'text-orange-600' : 'text-gray-400 hover:text-gray-600'}`}>
               <IndianRupee size={18} /> Payment Status
+              {activeTab === 'payments' && <div className="absolute bottom-[-2px] left-0 w-full h-0.5 bg-orange-600 rounded-t-full"></div>}
             </button>
           </div>
 
-          {/* TAB 1: DELIVERY LIST (Kept static for now until we build the logic!) */}
+         {/* TAB 1: SMART DELIVERY LIST */}
           {activeTab === 'deliveries' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-               {/* ... (Your existing static delivery list code) ... */}
-               <div className="p-8 text-center text-gray-500">
-                 Delivery list will populate here once you accept requests!
-               </div>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[300px] flex flex-col">
+               {deliveryData.totalDeliveries > 0 ? (
+                 <>
+                   <div className="divide-y divide-gray-100 flex-1">
+                     {/* SLICE(0, 2): Only show the top 2 locations on the dashboard */}
+                     {Object.entries(deliveryData.groupedList).slice(0, 2).map(([location, students]) => (
+                       <div key={location} className="p-6">
+                         <div className="flex items-center justify-between mb-4">
+                           <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                             <MapPin className="text-orange-500" size={20} />
+                             {location}
+                           </h3>
+                           <span className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-xs font-bold border border-orange-100">
+                             {students.length} Tiffins
+                           </span>
+                         </div>
+
+                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-7">
+                           {students.map((student, idx) => (
+                             <div key={idx} className="flex items-center justify-between p-4 rounded-xl border border-gray-100 bg-gray-50 hover:bg-orange-50/50 hover:border-orange-100 transition-colors group">
+                               <div>
+                                 <p className="font-bold text-gray-900 mb-1">{student.customerName}</p>
+                                 <div className="flex items-center gap-3 text-xs text-gray-500 font-medium">
+                                   <span className="flex items-center gap-1"><Home size={12} className="text-gray-400"/> {student.roomNumber}</span>
+                                   <span className="capitalize px-1.5 py-0.5 bg-gray-200 text-gray-700 rounded text-[10px]">{student.mealType}</span>
+                                 </div>
+                               </div>
+                               <a href={`tel:${student.phone}`} className="w-9 h-9 rounded-full bg-white border border-gray-200 flex items-center justify-center text-green-600 hover:bg-green-50 hover:border-green-200 transition-colors shadow-sm shrink-0">
+                                 <PhoneCall size={14} />
+                               </a>
+                             </div>
+                           ))}
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                   
+                   {/* VIEW ALL BUTTON */}
+                   <button 
+                     onClick={() => navigate('/locations')} 
+                     className="w-full p-4 bg-orange-50 text-orange-700 font-bold hover:bg-orange-100 transition-colors flex items-center justify-center gap-2 border-t border-orange-100 mt-auto"
+                   >
+                     View Full Location Summary <ArrowRight size={18} />
+                   </button>
+                 </>
+               ) : (
+                 <div className="h-full flex flex-col items-center justify-center text-center p-12 mt-10">
+                   <div className="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center text-green-500 mb-4 shadow-sm">
+                     <CheckCircle size={32} />
+                   </div>
+                   <h3 className="text-xl font-bold text-gray-900 mb-2">Kitchen Closed!</h3>
+                   <p className="text-gray-500 text-sm max-w-sm">There are no scheduled deliveries for today.</p>
+                 </div>
+               )}
             </div>
           )}
 
           {/* TAB 2: PAYMENT TRACKER (Kept static for now) */}
           {activeTab === 'payments' && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-               {/* ... (Your existing static payment list code) ... */}
-               <div className="p-8 text-center text-gray-500">
-                 Payment tracking will populate here!
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden min-h-[300px] flex items-center justify-center">
+               <div className="p-8 text-center text-gray-500 font-medium">
+                 Payment tracking logic goes here!
                </div>
             </div>
           )}
@@ -157,23 +229,23 @@ const VendorDashboard = () => {
             
             {menu ? (
               <div className="space-y-3 flex-1">
-                <div className="p-3 bg-orange-50 rounded-xl border border-orange-100">
+                <div className="p-4 bg-orange-50 rounded-xl border border-orange-100">
                   <span className="text-xs font-bold text-orange-800 uppercase tracking-wide block mb-1">Lunch ({menu.lunch.time})</span>
-                  <p className="text-gray-700 text-sm font-medium">{menu.lunch.items}</p>
+                  <p className="text-gray-700 text-sm font-medium whitespace-pre-wrap">{menu.lunch.items}</p>
                 </div>
                 {menu.dinner && (
-                  <div className="p-3 bg-gray-50 rounded-xl border border-gray-100">
+                  <div className="p-4 bg-gray-50 rounded-xl border border-gray-100">
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wide block mb-1">Dinner ({menu.dinner.time})</span>
-                    <p className="text-gray-700 text-sm font-medium">{menu.dinner.items}</p>
+                    <p className="text-gray-700 text-sm font-medium whitespace-pre-wrap">{menu.dinner.items}</p>
                   </div>
                 )}
               </div>
             ) : (
               /* EMPTY STATE: No Menu Uploaded */
-              <div className="flex-1 flex flex-col items-center justify-center py-6 text-center border-2 border-dashed border-gray-100 rounded-xl">
-                <ChefHat className="text-gray-300 mb-2" size={32} />
+              <div className="flex-1 flex flex-col items-center justify-center py-8 text-center border-2 border-dashed border-gray-100 rounded-xl">
+                <ChefHat className="text-gray-300 mb-3" size={36} />
                 <p className="text-gray-500 text-sm font-medium">You haven't set today's menu!</p>
-                <button onClick={() => navigate('/menu_management')} className="mt-3 bg-orange-100 text-orange-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-orange-200 transition-colors">
+                <button onClick={() => navigate('/menu_management')} className="mt-4 bg-orange-100 text-orange-700 px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-orange-200 transition-colors shadow-sm">
                   Add Menu Now
                 </button>
               </div>
@@ -193,7 +265,6 @@ const VendorDashboard = () => {
             
             {/* REQUESTS BUTTON */}
             <button onClick={() => navigate('/students')} className="p-4 bg-white border border-gray-200 rounded-xl hover:border-orange-400 hover:shadow-md transition-all group flex flex-col items-center gap-2 relative">
-              {/* If there are pending requests, we can make this dot pulse! */}
               <span className="absolute top-2 right-2 flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span>
                 <span className="relative inline-flex rounded-full h-3 w-3 bg-orange-500"></span>
@@ -209,12 +280,6 @@ const VendorDashboard = () => {
           </div>
         </div>
       </div>
-
-      {/* --- EXTRAS STORE (Kept static for now) --- */}
-      <div className="pt-6 border-t border-gray-200">
-          {/* ... (Your existing Store code) ... */}
-      </div>
-
     </div>
   );
 };

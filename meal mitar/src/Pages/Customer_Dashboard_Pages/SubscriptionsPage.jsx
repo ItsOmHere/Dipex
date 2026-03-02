@@ -17,30 +17,39 @@ const SubscriptionsPage = () => {
     return 30; // Default fallback
   };
 
-  // 2. Calculate days left and progress
+// 2. Calculate days left and progress (UPDATED WITH HOLIDAY LOGIC)
   const getSubscriptionStats = (sub) => {
-    // Ideally, your backend sets a "startDate" when the vendor clicks Accept.
-    // If not, we fallback to updatedAt or createdAt
-    const startDate = new Date(sub.startDate || sub.updatedAt || sub.createdAt);
-    const totalDays = getPlanDuration(sub.planType);
+    // Determine the base duration (e.g., 30 days)
+    const baseDuration = getPlanDuration(sub.planType);
     
+    // Count how many holidays the student has marked
+    // Assume backend provides sub.skippedDates = ['2026-03-08', '2026-03-09']
+    const skippedDaysCount = sub.skippedDates ? sub.skippedDates.length : 0;
+    
+    // Total days the subscription will span = Base Plan + Holidays
+    const totalSpan = baseDuration + skippedDaysCount;
+
+    const startDate = new Date(sub.startDate || sub.updatedAt || sub.createdAt);
+    
+    // Calculate the NEW Extended End Date
     const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + totalDays);
+    endDate.setDate(startDate.getDate() + totalSpan);
 
     const today = new Date();
-    // Calculate difference in days
-    const diffTime = endDate.getTime() - today.getTime();
-    const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     
-    // Ensure we don't go below 0 or above total days
-    const safeDaysLeft = Math.max(0, Math.min(daysLeft, totalDays));
-    const progressPercentage = ((totalDays - safeDaysLeft) / totalDays) * 100;
+    // Calculate difference in days between today and the new extended end date
+    const diffTime = endDate.getTime() - today.getTime();
+    const daysLeftOverall = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Ensure we don't go below 0 or above the total span
+    const safeDaysLeft = Math.max(0, Math.min(daysLeftOverall, totalSpan));
+    const progressPercentage = ((totalSpan - safeDaysLeft) / totalSpan) * 100;
 
     return { 
       startDate, 
-      endDate, 
-      totalDays, 
-      daysLeft: safeDaysLeft, 
+      endDate, // This is now dynamically extended!
+      totalDays: baseDuration, // What they originally paid for
+      daysLeft: safeDaysLeft, // How many calendar days until it expires
       progressPercentage,
       isExpiringSoon: safeDaysLeft > 0 && safeDaysLeft <= 3,
       isExpired: safeDaysLeft === 0
@@ -184,7 +193,7 @@ const SubscriptionsPage = () => {
                     </div>
                   )}
 
-                  {/* DYNAMIC ACTION BUTTONS */}
+               {/* DYNAMIC ACTION BUTTONS */}
                   {sub.status === 'active' && (
                     <div className="flex flex-wrap gap-3 mt-auto">
                       {stats.isExpiringSoon && !stats.isExpired ? (
@@ -197,6 +206,14 @@ const SubscriptionsPage = () => {
                         </button>
                       )}
                       
+                      {/* --- NEW BUTTON: Jump straight to the calendar --- */}
+                      <button 
+                        onClick={() => navigate('/dashboard/calendar')} 
+                        className="flex items-center gap-2 px-5 py-2.5 border border-orange-200 bg-orange-50 text-orange-700 rounded-lg text-sm font-bold hover:bg-orange-100 transition-colors shadow-sm"
+                      >
+                        <Calendar size={16} /> Mark Holiday
+                      </button>
+
                       <button className="flex items-center gap-2 px-5 py-2.5 border border-red-100 bg-white text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 hover:border-red-200 transition-colors shadow-sm">
                         <X size={16} /> Cancel
                       </button>
@@ -204,6 +221,7 @@ const SubscriptionsPage = () => {
                   )}
 
                 </div>
+
               </div>
             </div>
           );

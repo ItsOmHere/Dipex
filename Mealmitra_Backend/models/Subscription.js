@@ -21,10 +21,11 @@ const subscriptionSchema = new mongoose.Schema({
     enum: ['pending', 'active', 'paused', 'cancelled', 'expired'], 
     default: 'pending' 
   },
-  // THE "SKIP TODAY" FEATURE LOGIC: 
-  // We store an array of dates the user skipped, so the vendor knows not to deliver, 
-  // and we can calculate refunds/credits at the end of the month!
-  skippedDates: [{ type: Date }] 
+  // Stores skipped dates in YYYY-MM-DD format to match frontend calendar keys
+  skippedDates: {
+    type: [String],
+    default: []
+  }
 
 }, { timestamps: true });
 

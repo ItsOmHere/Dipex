@@ -15,5 +15,6 @@ router.put('/update-request', authMiddleware, vendorController.updateRequestStat
 router.get('/communications', authMiddleware, vendorController.getCommunicationData);
 router.put('/update-menu', authMiddleware, vendorController.updateWeeklyMenu);
 router.post('/post-announcement', authMiddleware, vendorController.postAnnouncement);
+router.get('/deliveries/today', authMiddleware, vendorController.getDailyDeliveryList);
 
 module.exports = router;

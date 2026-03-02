@@ -223,3 +223,87 @@ exports.postAnnouncement = async (req, res) => {
     res.status(500).json({ message: 'Server error posting announcement' });
   }
 };
+
+// --- Get Daily Delivery List (Smart Grouping & Holiday Filter) ---
+exports.getDailyDeliveryList = async (req, res) => {
+  try {
+    // 1. Get the Vendor Profile using your specific auth setup
+    const vendorProfile = await VendorProfile.findOne({ vendorId: req.user.userId });
+    if (!vendorProfile) {
+      return res.status(404).json({ message: 'Vendor profile not found' });
+    }
+
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date();
+    const todayDateString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+
+    // 2. Fetch all ACTIVE subscriptions for this vendor
+    // We populate the 'customer' field to get their name, phone, location, and roomNumber
+    const allActiveSubs = await Subscription.find({ 
+      vendor: vendorProfile._id, 
+      status: 'active' 
+    }).populate('customer', 'name phone location roomNumber');
+
+    // 3. The Filter: Remove anyone who has marked today as a holiday
+    const deliveriesToday = allActiveSubs.filter(sub => {
+      // If skippedDates doesn't exist or today is NOT in the array, they get food!
+      return !sub.skippedDates || !sub.skippedDates.includes(todayDateString);
+    });
+
+    // 4. Smart Grouping: Group the remaining students by their Hostel/Location
+    const groupedDeliveries = deliveriesToday.reduce((acc, sub) => {
+      // Safety check in case the customer account was deleted
+      if (!sub.customer) return acc; 
+
+      const location = sub.customer.location || 'Unspecified Location';
+      
+      if (!acc[location]) {
+        acc[location] = [];
+      }
+      
+      acc[location].push({
+        subscriptionId: sub._id,
+        customerName: sub.customer.name,
+        roomNumber: sub.customer.roomNumber || 'N/A',
+        phone: sub.customer.phone,
+        planType: sub.planType,
+        mealType: sub.mealType // Veg, Non-Veg
+      });
+      
+      return acc;
+    }, {});
+
+    // 5. Send it back to the React frontend
+    res.status(200).json({ 
+      date: todayDateString,
+      totalDeliveries: deliveriesToday.length,
+      groupedList: groupedDeliveries 
+    });
+
+  } catch (error) {
+    console.error("Error fetching delivery list:", error);
+    res.status(500).json({ message: 'Server error fetching delivery list' });
+  }
+};
+
+// --- 1. Fetch Students (Pending & Active) ---
+exports.getVendorStudents = async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const vendorProfile = await VendorProfile.findOne({ vendorId: userId });
+
+    if (!vendorProfile) {
+      return res.status(404).json({ message: 'Vendor profile not found' });
+    }
+
+    // UPDATE THIS LINE to include phone and roomNumber
+    const students = await Subscription.find({ vendor: vendorProfile._id })
+      .populate('customer', 'name email phone location roomNumber') 
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(students);
+  } catch (error) {
+    console.error("Error fetching students:", error);
+    res.status(500).json({ message: 'Server error fetching students' });
+  }
+};

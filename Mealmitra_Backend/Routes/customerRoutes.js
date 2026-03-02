@@ -15,4 +15,10 @@ router.get('/vendors/:id', authMiddleware, customerController.getVendorById);
 router.post('/subscribe', authMiddleware, customerController.createSubscriptionRequest);
 // GET /api/customer/subscriptions
 router.get('/subscriptions', authMiddleware, customerController.getMySubscriptions);
+
+router.put('/subscriptions/:id/holidays', authMiddleware, customerController.updateHolidays);
+
+router.get('/profile', authMiddleware, customerController.getProfile);
+router.put('/profile', authMiddleware, customerController.updateProfile);
+
 module.exports = router;
