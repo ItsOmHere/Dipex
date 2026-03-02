@@ -1,11 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Pause, X, Clock } from 'lucide-react';
+import { Calendar, Pause, X, Clock, Hourglass, AlertCircle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const SubscriptionsPage = () => {
   const navigate = useNavigate();
   const [subscriptions, setSubscriptions] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // --- HELPER FUNCTIONS FOR DATES ---
+  // 1. Determine total days based on plan type string
+  const getPlanDuration = (planType) => {
+    const type = planType?.toLowerCase() || '';
+    if (type.includes('weekly') || type.includes('7_days')) return 7;
+    if (type.includes('15_days')) return 15;
+    if (type.includes('monthly') || type.includes('30_days')) return 30;
+    return 30; // Default fallback
+  };
+
+  // 2. Calculate days left and progress
+  const getSubscriptionStats = (sub) => {
+    // Ideally, your backend sets a "startDate" when the vendor clicks Accept.
+    // If not, we fallback to updatedAt or createdAt
+    const startDate = new Date(sub.startDate || sub.updatedAt || sub.createdAt);
+    const totalDays = getPlanDuration(sub.planType);
+    
+    const endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + totalDays);
+
+    const today = new Date();
+    // Calculate difference in days
+    const diffTime = endDate.getTime() - today.getTime();
+    const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    // Ensure we don't go below 0 or above total days
+    const safeDaysLeft = Math.max(0, Math.min(daysLeft, totalDays));
+    const progressPercentage = ((totalDays - safeDaysLeft) / totalDays) * 100;
+
+    return { 
+      startDate, 
+      endDate, 
+      totalDays, 
+      daysLeft: safeDaysLeft, 
+      progressPercentage,
+      isExpiringSoon: safeDaysLeft > 0 && safeDaysLeft <= 3,
+      isExpired: safeDaysLeft === 0
+    };
+  };
 
   // --- FETCH SUBSCRIPTIONS ON LOAD ---
   useEffect(() => {
@@ -50,97 +90,124 @@ const SubscriptionsPage = () => {
 
       {/* --- MAP THROUGH DATABASE SUBSCRIPTIONS --- */}
       {subscriptions.length > 0 ? (
-        subscriptions.map((sub) => (
-          <div key={sub._id} className="bg-white border border-gray-200 rounded-xl p-6 mb-8 shadow-sm">
-            <div className="flex flex-col md:flex-row gap-6">
-              
-              {/* Image Section */}
-              <div className="shrink-0">
-                <img
-                  src="https://images.unsplash.com/photo-1565557623262-b51c2513a641?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80"
-                  alt="Tiffin Service"
-                  className="w-full md:w-64 h-48 object-cover rounded-xl"
-                />
-              </div>
+        subscriptions.map((sub) => {
+          const stats = getSubscriptionStats(sub);
 
-              {/* Content Section */}
-              <div className="flex-1">
+          return (
+            <div key={sub._id} className={`bg-white border rounded-xl p-6 mb-8 shadow-sm transition-all ${stats.isExpiringSoon && sub.status === 'active' ? 'border-red-200' : 'border-gray-200'}`}>
+              <div className="flex flex-col md:flex-row gap-6">
                 
-                {/* Top Row: Title, Status, Price */}
-                <div className="flex flex-col sm:flex-row justify-between items-start mb-6">
-                  <div>
-                    <h2 className="text-xl font-bold text-gray-900 mb-2">
-                      {sub.vendor ? sub.vendor.businessName : 'Unknown Vendor'}
-                    </h2>
-                    
-                    {/* DYNAMIC STATUS BADGE */}
-                    {sub.status === 'pending' && (
-                      <span className="bg-yellow-100 text-yellow-800 border border-yellow-200 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide flex items-center gap-1 inline-flex">
-                        <Clock size={12} /> Pending Approval
-                      </span>
-                    )}
-                    {sub.status === 'active' && (
-                      <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide inline-flex">
-                        Active
-                      </span>
-                    )}
-                    {(sub.status === 'cancelled' || sub.status === 'expired') && (
-                      <span className="bg-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide inline-flex">
-                        {sub.status}
-                      </span>
-                    )}
-                  </div>
+                {/* Image Section */}
+                <div className="shrink-0 relative">
+                  <img
+                    src="https://images.unsplash.com/photo-1565557623262-b51c2513a641?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80"
+                    alt="Tiffin Service"
+                    className="w-full md:w-64 h-full min-h-[12rem] object-cover rounded-xl"
+                  />
+                  {stats.isExpiringSoon && sub.status === 'active' && (
+                     <div className="absolute top-3 left-3 bg-red-600 text-white text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-md">
+                       <AlertCircle size={14} /> Expiring Soon
+                     </div>
+                  )}
+                </div>
+
+                {/* Content Section */}
+                <div className="flex-1 flex flex-col justify-between">
                   
-                  <div className="mt-4 sm:mt-0 text-left sm:text-right">
-                    <p className="text-gray-500 text-xs mb-1">Total Amount</p>
-                    <h3 className="text-3xl font-bold text-orange-600">₹{sub.price}</h3>
-                    <p className="text-gray-400 text-xs capitalize">{sub.planType.replace('_', ' ')}</p>
+                  {/* Top Row: Title, Status, Price */}
+                  <div className="flex flex-col sm:flex-row justify-between items-start mb-6">
+                    <div>
+                      <h2 className="text-xl font-bold text-gray-900 mb-2">
+                        {sub.vendor ? sub.vendor.businessName : 'Unknown Vendor'}
+                      </h2>
+                      
+                      {/* DYNAMIC STATUS BADGE */}
+                      {sub.status === 'pending' && (
+                        <span className="bg-yellow-100 text-yellow-800 border border-yellow-200 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide inline-flex items-center gap-1">
+                          <Clock size={12} /> Pending Approval
+                        </span>
+                      )}
+                      {sub.status === 'active' && !stats.isExpired && (
+                        <span className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide inline-flex">
+                          Active
+                        </span>
+                      )}
+                      {(sub.status === 'cancelled' || stats.isExpired) && (
+                        <span className="bg-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide inline-flex">
+                          {stats.isExpired ? 'Expired' : sub.status}
+                        </span>
+                      )}
+                    </div>
+                    
+                    <div className="mt-4 sm:mt-0 text-left sm:text-right">
+                      <p className="text-gray-500 text-xs mb-1">Total Amount</p>
+                      <h3 className="text-3xl font-bold text-orange-600">₹{sub.price}</h3>
+                      <p className="text-gray-400 text-xs capitalize">{sub.planType.replace('_', ' ')}</p>
+                    </div>
                   </div>
+
+                  {/* Details Grid & Progress Bar (ONLY SHOW IF ACTIVE) */}
+                  {sub.status === 'active' && (
+                    <div className="bg-gray-50 border border-gray-100 rounded-xl p-4 mb-6">
+                      <div className="flex justify-between text-sm mb-2">
+                        <span className="text-gray-600 font-medium flex items-center gap-1">
+                          <Calendar size={14} className="text-gray-400"/> 
+                          {stats.startDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                        <span className={`font-bold flex items-center gap-1 ${stats.isExpiringSoon ? 'text-red-600' : 'text-orange-600'}`}>
+                          <Hourglass size={14} /> 
+                          {stats.daysLeft} Days Left
+                        </span>
+                        <span className="text-gray-600 font-medium">
+                          {stats.endDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                      </div>
+                      
+                      {/* Progress Bar */}
+                      <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                        <div 
+                          className={`h-2.5 rounded-full transition-all duration-1000 ${stats.isExpiringSoon ? 'bg-red-500' : 'bg-orange-500'}`} 
+                          style={{ width: `${stats.progressPercentage}%` }}
+                        ></div>
+                      </div>
+                      <p className="text-center text-xs text-gray-400 mt-2 mt-1">
+                        {stats.totalDays - stats.daysLeft} out of {stats.totalDays} days completed
+                      </p>
+                    </div>
+                  )}
+
+                  {/* If pending, just show a message */}
+                  {sub.status === 'pending' && (
+                    <div className="bg-gray-50 border border-gray-100 p-4 rounded-xl text-sm text-gray-600 mb-6 flex-1">
+                      <p className="font-semibold text-gray-900 mb-1">Awaiting Vendor Confirmation</p>
+                      Request sent on {new Date(sub.createdAt).toLocaleDateString('en-IN')}. You will be notified once they accept it.
+                    </div>
+                  )}
+
+                  {/* DYNAMIC ACTION BUTTONS */}
+                  {sub.status === 'active' && (
+                    <div className="flex flex-wrap gap-3 mt-auto">
+                      {stats.isExpiringSoon && !stats.isExpired ? (
+                        <button className="flex items-center gap-2 px-6 py-2.5 bg-red-600 text-white rounded-lg text-sm font-bold hover:bg-red-700 transition-colors shadow-sm animate-pulse">
+                          <RefreshCw size={16} /> Renew Now
+                        </button>
+                      ) : (
+                        <button className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:text-black transition-colors shadow-sm">
+                          <Pause size={16} /> Pause
+                        </button>
+                      )}
+                      
+                      <button className="flex items-center gap-2 px-5 py-2.5 border border-red-100 bg-white text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 hover:border-red-200 transition-colors shadow-sm">
+                        <X size={16} /> Cancel
+                      </button>
+                    </div>
+                  )}
+
                 </div>
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-8">
-                  <div>
-                    <p className="text-gray-400 text-xs mb-1">Plan Details</p>
-                    <p className="font-semibold text-gray-900 text-base capitalize">{sub.planType.replace('_', ' ')}</p>
-                    <p className="text-gray-500 text-sm capitalize">Meal Type: {sub.mealType}</p>
-                  </div>
-
-                  <div>
-                    <p className="text-gray-400 text-xs mb-1 flex items-center gap-1">
-                      <Calendar size={12} /> Request Date
-                    </p>
-                    {/* Safely format the date it was created */}
-                    <p className="font-semibold text-gray-900 text-base">
-                      {new Date(sub.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                    </p>
-                  </div>
-                </div>
-
-                {/* DYNAMIC ACTION BUTTONS */}
-                {/* Only show Pause/Cancel if the subscription is actually active! */}
-                {sub.status === 'active' && (
-                  <div className="flex flex-wrap gap-3">
-                    <button className="flex items-center gap-2 px-5 py-2.5 border border-gray-300 rounded-lg text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:text-black transition-colors shadow-sm">
-                      <Pause size={16} /> Pause Subscription
-                    </button>
-                    <button className="flex items-center gap-2 px-5 py-2.5 border border-red-100 bg-white text-red-600 rounded-lg text-sm font-semibold hover:bg-red-50 hover:border-red-200 transition-colors shadow-sm">
-                      <X size={16} /> Cancel Subscription
-                    </button>
-                  </div>
-                )}
-                
-                {/* If pending, just show a message instead of buttons */}
-                {sub.status === 'pending' && (
-                  <div className="bg-gray-50 border border-gray-100 p-3 rounded-lg text-sm text-gray-600">
-                    The vendor is reviewing your request. You will be notified once they accept it.
-                  </div>
-                )}
-
               </div>
             </div>
-          </div>
-        ))
+          );
+        })
       ) : (
         /* EMPTY STATE: No subscriptions found */
         <div className="bg-white border border-gray-200 rounded-xl p-10 text-center shadow-sm">
@@ -169,7 +236,7 @@ const SubscriptionsPage = () => {
 
 const BenefitItem = ({ text }) => (
   <li className="flex items-start gap-3">
-    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full mt-2 shrink-0"></div>
+    <div className="w-1.5 h-1.5 bg-orange-400 rounded-full mt-2 shrink-0"></div>
     <span>{text}</span>
   </li>
 );
