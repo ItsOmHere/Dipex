@@ -16,7 +16,6 @@ import SubscriptionsPage from './Pages/Customer_Dashboard_Pages/SubscriptionsPag
 import OrdersPage from './Pages/Customer_Dashboard_Pages/Orderspage.jsx'
 import HolidayCalendarPage from './Pages/Customer_Dashboard_Pages/HolidayCalendarPage.jsx'
 import PaymentsPage from './Pages/Customer_Dashboard_Pages/PaymentsPage.jsx'
-import MessagesPage from './Pages/Customer_Dashboard_Pages/MessagesPage.jsx'
 import ReviewsPage from './Pages/Customer_Dashboard_Pages/ReviewsPage.jsx'
 import NotificationsPage from './Pages/Customer_Dashboard_Pages/NotificationsPage.jsx'
 import ProfilePage from './Pages/Customer_Dashboard_Pages/ProfilePage.jsx'
@@ -65,7 +64,6 @@ const App = () => {
             <Route path="orders" element={<OrdersPage />} />
             <Route path="calendar" element={<HolidayCalendarPage />} />
             <Route path="payments" element={<PaymentsPage />} />
-            <Route path="messages" element={<MessagesPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
             <Route path="notifications" element={<NotificationsPage />} />
             <Route path="profile" element={<ProfilePage />} /> 
@@ -96,4 +94,6 @@ const App = () => {
 }
 
 export default App
+
+
 

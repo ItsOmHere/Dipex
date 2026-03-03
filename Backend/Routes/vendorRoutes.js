@@ -5,6 +5,7 @@ const authMiddleware = require('../middleware/authMiddleware');
 
 // GET /api/vendor/dashboard
 router.get('/dashboard', authMiddleware, vendorController.getVendorDashboard);
+router.get('/reviews', authMiddleware, vendorController.getVendorReviews);
 // GET /api/vendor/students
 router.get('/students', authMiddleware, vendorController.getVendorStudents);
 

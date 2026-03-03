@@ -15,6 +15,8 @@ router.get('/vendors/:id', authMiddleware, customerController.getVendorById);
 router.post('/subscribe', authMiddleware, customerController.createSubscriptionRequest);
 // GET /api/customer/subscriptions
 router.get('/subscriptions', authMiddleware, customerController.getMySubscriptions);
+// GET /api/customer/orders
+router.get('/orders', authMiddleware, customerController.getMyOrders);
 
 router.put('/subscriptions/:id/holidays', authMiddleware, customerController.updateHolidays);
 
@@ -22,4 +24,7 @@ router.get('/profile', authMiddleware, customerController.getProfile);
 router.put('/profile', authMiddleware, customerController.updateProfile);
 // Payment Route
 router.get('/payments', authMiddleware, customerController.getCustomerPayments);
+router.get('/reviews', authMiddleware, customerController.getCustomerReviews);
+router.post('/reviews', authMiddleware, customerController.createOrUpdateReview);
+router.delete('/reviews/:reviewId', authMiddleware, customerController.deleteMyReview);
 module.exports = router;

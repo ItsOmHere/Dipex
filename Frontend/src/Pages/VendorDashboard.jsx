@@ -69,8 +69,13 @@ const VendorDashboard = () => {
   }
 
   // Fallback to empty object if data is missing
-  const business = dashboardData?.business || {};
+  const business = dashboardData?.vendorProfile || {};
   const menu = dashboardData?.todaysMenu || null;
+  const hasReviews = Number(business.totalReviews || 0) > 0;
+  const vendorRatingValue = hasReviews ? Number(business.rating || 0).toFixed(1) : "New";
+  const vendorRatingSubtext = hasReviews
+    ? `${business.totalReviews} customer review${business.totalReviews > 1 ? 's' : ''}`
+    : "No customer reviews yet";
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-8">
@@ -132,7 +137,13 @@ const VendorDashboard = () => {
           <StatsCard title="Today's Deliveries" value={deliveryData.totalDeliveries || "0"} subtext="Meals to prepare" icon={<ClipboardList size={24} className="text-orange-600" />} color="bg-orange-100" />
         </button>
         <button onClick={() => navigate("/Reviews")} className="text-left w-full">
-          <StatsCard title="Vendor Rating" value={business.rating || "New"} subtext="Customer Feedback" icon={<Star size={24} className="text-yellow-500 fill-yellow-500" />} color="bg-yellow-100" />
+          <StatsCard
+            title="Vendor Rating"
+            value={vendorRatingValue}
+            subtext={vendorRatingSubtext}
+            icon={<Star size={24} className="text-yellow-500 fill-yellow-500" />}
+            color="bg-yellow-100"
+          />
         </button>
       </div>
 

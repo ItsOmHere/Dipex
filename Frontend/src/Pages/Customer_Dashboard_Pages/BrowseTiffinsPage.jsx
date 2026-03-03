@@ -4,29 +4,26 @@ import { useNavigate } from 'react-router-dom';
 
 const BrowseTiffinsPage = () => {
   const navigate = useNavigate();
-  
-  // --- 1. NEW STATE FOR VENDORS ---
+
   const [vendors, setVendors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // --- 2. FETCH VENDORS ON LOAD ---
   useEffect(() => {
     const fetchVendors = async () => {
       try {
         const token = localStorage.getItem('token');
         const response = await fetch('http://localhost:5000/api/customer/vendors', {
           headers: {
-            'Authorization': `Bearer ${token}`
+            Authorization: `Bearer ${token}`
           }
         });
 
         if (response.ok) {
           const data = await response.json();
-          setVendors(data); // Save the database vendors to state!
-          console.log(data);
+          setVendors(data);
         }
       } catch (error) {
-        console.error("Error fetching vendors:", error);
+        console.error('Error fetching vendors:', error);
       } finally {
         setIsLoading(false);
       }
@@ -35,13 +32,12 @@ const BrowseTiffinsPage = () => {
     fetchVendors();
   }, []);
 
-  // Helper function to convert DB enum values to nice UI tags
   const generateTags = (foodType, deliveryType) => {
     const tags = [];
     if (foodType === 'veg') tags.push('Veg');
     if (foodType === 'nonveg') tags.push('Non-Veg');
     if (foodType === 'mix') tags.push('Veg & Non-Veg');
-    
+
     if (deliveryType === 'delivery' || deliveryType === 'both') tags.push('Delivery');
     if (deliveryType === 'pickup' || deliveryType === 'both') tags.push('Pickup');
     return tags;
@@ -54,7 +50,6 @@ const BrowseTiffinsPage = () => {
         <p className="text-gray-500 mt-1">Discover delicious homemade meals near you</p>
       </div>
 
-      {/* Search Bar Row (Kept exactly as you designed it) */}
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="flex-1 relative">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
@@ -75,16 +70,13 @@ const BrowseTiffinsPage = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        
-        {/* --- Left Column: Filters (Kept exactly as you designed it) --- */}
         <div className="lg:col-span-1 space-y-6">
-           {/* ... (Your existing filter code goes here, keeping it hidden for brevity but you leave yours intact!) ... */}
-           <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm sticky top-6">
+          <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm sticky top-6">
             <div className="flex items-center gap-2 mb-6 text-gray-900">
               <Filter size={20} />
               <h3 className="font-bold text-lg">Filters</h3>
             </div>
-            {/* Food Type */}
+
             <div className="mb-6">
               <h4 className="font-semibold mb-3">Food Type</h4>
               <label className="flex items-center gap-3 text-gray-600 cursor-pointer hover:text-orange-600">
@@ -92,7 +84,7 @@ const BrowseTiffinsPage = () => {
                 <span className="text-sm">Vegetarian Only</span>
               </label>
             </div>
-            {/* Service Type */}
+
             <div className="mb-6">
               <h4 className="font-semibold mb-3">Service Type</h4>
               <div className="space-y-2">
@@ -110,33 +102,39 @@ const BrowseTiffinsPage = () => {
           </div>
         </div>
 
-        {/* --- Right Column: Dynamic Service Cards --- */}
         <div className="lg:col-span-3">
           {isLoading ? (
             <p className="text-gray-500 text-sm mb-4">Loading vendors...</p>
           ) : (
             <>
               <p className="text-gray-500 text-sm mb-4">{vendors.length} services found</p>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* --- 3. MAP THROUGH REAL DATABASE VENDORS --- */}
                 {vendors.length > 0 ? (
-                  vendors.map((vendor) => (
-                    <ServiceCard 
-                      key={vendor._id}
-                      navigate={navigate}
-                      // For now, using a placeholder image. We can add image uploads later!
-                      image="https://images.unsplash.com/photo-1565557623262-b51c2513a641?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80"
-                      title={vendor.businessName}
-                      rating={vendor.rating || "New"}
-                      subtitle={`Service Area: ${vendor.serviceArea}`}
-                      description={`Offering high-quality ${vendor.foodType} meals.`}
-                      price="Starts at ₹100" // We will make this dynamic when vendors add menus!
-                      distance={vendor.serviceArea} 
-                      tags={generateTags(vendor.foodType, vendor.deliveryType)}
-                      vendorId={vendor._id} // Pass the ID so we can navigate to their specific page!
-                    />
-                  ))
+                  vendors.map((vendor) => {
+                    const totalReviews = Number(vendor.totalReviews || 0);
+                    const ratingLabel = totalReviews > 0 ? Number(vendor.rating || 0).toFixed(1) : 'New';
+                    const ratingMeta = totalReviews > 0
+                      ? `${totalReviews} review${totalReviews > 1 ? 's' : ''}`
+                      : 'No reviews yet';
+
+                    return (
+                      <ServiceCard
+                        key={vendor._id}
+                        navigate={navigate}
+                        image="https://images.unsplash.com/photo-1565557623262-b51c2513a641?ixlib=rb-1.2.1&auto=format&fit=crop&w=600&q=80"
+                        title={vendor.businessName}
+                        rating={ratingLabel}
+                        ratingMeta={ratingMeta}
+                        subtitle={`Service Area: ${vendor.serviceArea}`}
+                        description={`Offering high-quality ${vendor.foodType} meals.`}
+                        price="Starts at Rs100"
+                        distance={vendor.serviceArea}
+                        tags={generateTags(vendor.foodType, vendor.deliveryType)}
+                        vendorId={vendor._id}
+                      />
+                    );
+                  })
                 ) : (
                   <p className="text-gray-500">No vendors found in your area yet.</p>
                 )}
@@ -144,15 +142,12 @@ const BrowseTiffinsPage = () => {
             </>
           )}
         </div>
-
       </div>
     </>
   );
 };
 
-// --- Helper Component ---
-// Added vendorId to the props
-const ServiceCard = ({ navigate, image, title, rating, subtitle, description, price, distance, tags, vendorId }) => (
+const ServiceCard = ({ navigate, image, title, rating, ratingMeta, subtitle, description, price, distance, tags, vendorId }) => (
   <div className="bg-white border border-gray-200 rounded-xl overflow-hidden hover:shadow-lg transition-shadow duration-300">
     <div className="h-48 overflow-hidden relative">
       <img src={image} alt={title} className="w-full h-full object-cover" />
@@ -166,7 +161,8 @@ const ServiceCard = ({ navigate, image, title, rating, subtitle, description, pr
           {rating}
         </div>
       </div>
-      
+
+      <p className="text-gray-400 text-xs mb-2 -mt-1">{ratingMeta}</p>
       <p className="text-gray-500 text-sm mb-2">{subtitle}</p>
       <p className="text-gray-600 text-sm leading-relaxed mb-4 line-clamp-2">
         {description}
@@ -200,7 +196,6 @@ const ServiceCard = ({ navigate, image, title, rating, subtitle, description, pr
             {distance}
           </div>
         </div>
-        {/* Dynamic Navigation: Route to the specific vendor's ID */}
         <button onClick={() => navigate(`/dashboard/Details_ven/${vendorId}`)} className="bg-[#EA580C] hover:bg-orange-700 text-white px-4 py-2 rounded-lg text-sm font-semibold transition-colors">
           View Details
         </button>

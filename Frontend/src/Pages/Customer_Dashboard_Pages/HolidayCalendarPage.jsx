@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight, Info, AlertCircle, Save, ChefHat } from 'lucide-react';
 
 const HolidayCalendarPage = () => {
+  const ONE_DAY_MS = 24 * 60 * 60 * 1000;
   const [currentDate, setCurrentDate] = useState(new Date()); 
   
   // --- NEW MULTI-SUBSCRIPTION STATES ---
@@ -71,6 +72,10 @@ const HolidayCalendarPage = () => {
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   const formatDateKey = (day) => `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  const parseDateKeyAsLocal = (dateKey) => {
+    const [year, month, day] = String(dateKey).split('-').map(Number);
+    return new Date(year, month - 1, day);
+  };
   const isHoliday = (day) => holidays.includes(formatDateKey(day));
 
   const handlePrevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
@@ -83,11 +88,8 @@ const HolidayCalendarPage = () => {
     const dateKey = formatDateKey(day);
     const selectedDateObj = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
     
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    if (selectedDateObj < tomorrow) {
+    const isAtLeast24HoursAway = (selectedDateObj.getTime() - Date.now()) >= ONE_DAY_MS;
+    if (!isAtLeast24HoursAway) {
       alert("Holidays must be marked at least 24 hours in advance!");
       return;
     }
@@ -101,12 +103,9 @@ const HolidayCalendarPage = () => {
   };
 
   const removeHoliday = (dateString) => {
-    const selectedDateObj = new Date(dateString);
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-
-    if (selectedDateObj < tomorrow) {
+    const selectedDateObj = parseDateKeyAsLocal(dateString);
+    const isAtLeast24HoursAway = (selectedDateObj.getTime() - Date.now()) >= ONE_DAY_MS;
+    if (!isAtLeast24HoursAway) {
       alert("You cannot modify holidays less than 24 hours away.");
       return;
     }
@@ -131,11 +130,21 @@ const HolidayCalendarPage = () => {
         body: JSON.stringify({ skippedDates: updatedHolidays })
       });
 
-      if (!response.ok) throw new Error("Failed to save holidays");
+      const result = await response.json();
+      if (!response.ok) throw new Error(result?.message || "Failed to save holidays");
+
+      const savedDates = (result?.subscription?.skippedDates || updatedHolidays)
+        .map(normalizeDateKey)
+        .filter(Boolean)
+        .sort();
+      setHolidays(savedDates);
+      if (Array.isArray(result?.ignoredDates) && result.ignoredDates.length > 0) {
+        alert("Some dates were not saved because they are less than 24 hours away.");
+      }
 
       // Update local state so if they switch dropdowns and come back, the data is preserved
       setSubscriptions(prev => prev.map(sub => 
-        sub._id === activeSubscriptionId ? { ...sub, skippedDates: updatedHolidays } : sub
+        sub._id === activeSubscriptionId ? { ...sub, skippedDates: savedDates } : sub
       ));
 
     } catch (error) {

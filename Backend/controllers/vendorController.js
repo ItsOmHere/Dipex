@@ -2,6 +2,7 @@ const VendorProfile = require('../models/VendorProfile');
 const Subscription = require('../models/Subscription');
 const User = require('../models/User');
 const Announcement = require('../models/Announcement');
+const Review = require('../models/Review');
 
 // GET /api/vendor/dashboard
 // Fetch dashboard data for a vendor (analytics, pending requests, etc.)
@@ -46,6 +47,37 @@ exports.getVendorDashboard = async (req, res) => {
   } catch (error) {
     console.error("Vendor Dashboard Error:", error);
     res.status(500).json({ message: 'Server error fetching vendor dashboard' });
+  }
+};
+
+// GET /api/vendor/reviews
+exports.getVendorReviews = async (req, res) => {
+  try {
+    const vendorProfile = await VendorProfile.findOne({ vendorId: req.user.userId });
+    if (!vendorProfile) {
+      return res.status(404).json({ message: 'Vendor profile not found' });
+    }
+
+    const reviews = await Review.find({ vendor: vendorProfile._id })
+      .populate('customer', 'name')
+      .sort({ createdAt: -1 });
+
+    const formattedReviews = reviews.map((review) => ({
+      _id: review._id,
+      student: review.customer?.name || 'Unknown',
+      rating: review.rating,
+      text: review.text,
+      createdAt: review.createdAt
+    }));
+
+    res.status(200).json({
+      averageRating: Number(vendorProfile.rating || 0),
+      totalReviews: Number(vendorProfile.totalReviews || 0),
+      reviews: formattedReviews
+    });
+  } catch (error) {
+    console.error("Error fetching vendor reviews:", error);
+    res.status(500).json({ message: 'Server error fetching reviews' });
   }
 };
 

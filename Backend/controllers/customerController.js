@@ -2,6 +2,46 @@ const User = require('../models/User');
 const Subscription = require('../models/Subscription');
 const DailyMenu = require('../models/DailyMenu');
 const Announcement = require('../models/Announcement');
+const VendorProfile = require('../models/VendorProfile');
+const Review = require('../models/Review');
+
+const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+
+const normalizeDateKey = (value) => {
+  if (!value) return null;
+  const raw = String(value).trim();
+  const dateKey = raw.includes('T') ? raw.slice(0, 10) : raw;
+  return /^\d{4}-\d{2}-\d{2}$/.test(dateKey) ? dateKey : null;
+};
+
+const parseDateKeyAsLocal = (dateKey) => {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+};
+
+const recomputeVendorRating = async (vendorId) => {
+  const result = await Review.aggregate([
+    { $match: { vendor: vendorId } },
+    {
+      $group: {
+        _id: '$vendor',
+        averageRating: { $avg: '$rating' },
+        totalReviews: { $sum: 1 }
+      }
+    }
+  ]);
+
+  if (!result.length) {
+    await VendorProfile.findByIdAndUpdate(vendorId, { rating: 0, totalReviews: 0 });
+    return;
+  }
+
+  const { averageRating, totalReviews } = result[0];
+  await VendorProfile.findByIdAndUpdate(vendorId, {
+    rating: Number(averageRating.toFixed(1)),
+    totalReviews
+  });
+};
 
 
 exports.getDailyDeliveryList = async (req, res) => {
@@ -103,28 +143,42 @@ exports.updateHolidays = async (req, res) => {
       return res.status(400).json({ error: "skippedDates must be an array." });
     }
 
-    // Normalize to YYYY-MM-DD and deduplicate
-    const normalizedDates = [...new Set(
-      skippedDates
-        .map((d) => String(d).trim())
-        .map((d) => (d.includes('T') ? d.slice(0, 10) : d))
-        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
-    )].sort();
+    const subscription = await Subscription.findOne({
+      _id: subscriptionId,
+      customer: customerId
+    });
 
-    // Update only if this subscription belongs to logged-in customer
-    const updatedSubscription = await Subscription.findByIdAndUpdate(
-      { _id: subscriptionId, customer: customerId },
-      { skippedDates: normalizedDates },
-      { new: true }
-    );
-
-    if (!updatedSubscription) {
+    if (!subscription) {
       return res.status(404).json({ error: "Subscription not found for this customer." });
     }
 
+    // Normalize to YYYY-MM-DD and deduplicate.
+    const normalizedDates = [...new Set(skippedDates.map(normalizeDateKey).filter(Boolean))].sort();
+
+    // Strict 24-hour rule from "right now". Dates closer than 24h are ignored.
+    const now = Date.now();
+    const validDates = [];
+    const ignoredDates = [];
+
+    normalizedDates.forEach((dateKey) => {
+      const targetDate = parseDateKeyAsLocal(dateKey);
+      const isAtLeast24HoursAway = (targetDate.getTime() - now) >= ONE_DAY_MS;
+      if (isAtLeast24HoursAway) {
+        validDates.push(dateKey);
+      } else {
+        ignoredDates.push(dateKey);
+      }
+    });
+
+    subscription.skippedDates = validDates;
+    const updatedSubscription = await subscription.save();
+
     res.status(200).json({ 
-      message: "Holidays updated successfully!", 
-      subscription: updatedSubscription 
+      message: ignoredDates.length
+        ? "Holidays updated. Some dates were not saved because they are less than 24 hours away."
+        : "Holidays updated successfully!",
+      subscription: updatedSubscription,
+      ignoredDates
     });
 
   } catch (error) {
@@ -234,8 +288,6 @@ exports.getDashboardData = async (req, res) => {
   }
 };
 
-const VendorProfile = require('../models/VendorProfile'); // Make sure this is imported at the top!
-
 exports.getAllVendors = async (req, res) => {
   try {
     // Find all vendor profiles in the database
@@ -324,7 +376,197 @@ exports.getMySubscriptions = async (req, res) => {
   }
 };
 
-// In controllers/customerController.js
+// --- Get My Orders (derived from customer subscriptions) ---
+exports.getMyOrders = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const subscriptions = await Subscription.find({ customer: customerId })
+      .populate('vendor', 'businessName deliveryType')
+      .sort({ createdAt: -1 });
+
+    const normalizePlanType = (planType) => {
+      if (!planType) return 'Plan';
+      return String(planType)
+        .split('_')
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+    };
+
+    const normalizeMealType = (mealType) => {
+      if (!mealType) return '';
+      const normalized = String(mealType).toLowerCase();
+      if (normalized === 'nonveg') return 'Non-Veg';
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    };
+
+    const formatStatus = (status, isExpiredByDate) => {
+      if (isExpiredByDate) return 'Expired';
+      const normalized = String(status || '').toLowerCase();
+      if (!normalized) return 'Pending';
+      return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+    };
+
+    const formattedOrders = subscriptions.map((sub) => {
+      const statusValue = String(sub.status || '').toLowerCase();
+      const endDate = sub.endDate ? new Date(sub.endDate) : null;
+      const isExpiredByDate = Boolean(endDate && endDate < today);
+      const isPast =
+        isExpiredByDate ||
+        ['cancelled', 'expired'].includes(statusValue);
+
+      return {
+        _id: sub._id,
+        vendorName: sub.vendor?.businessName || 'Unknown Vendor',
+        orderNumber: String(sub._id).slice(-6).toUpperCase(),
+        status: formatStatus(sub.status, isExpiredByDate),
+        planType: normalizePlanType(sub.planType),
+        mealType: normalizeMealType(sub.mealType),
+        orderDate: sub.createdAt,
+        startDate: sub.startDate,
+        endDate: sub.endDate,
+        deliveryType: sub.vendor?.deliveryType || 'Delivery',
+        totalAmount: sub.price || 0,
+        isPast
+      };
+    });
+
+    const activeOrders = formattedOrders.filter((order) => !order.isPast);
+    const pastOrders = formattedOrders.filter((order) => order.isPast);
+
+    res.status(200).json({
+      activeOrders,
+      pastOrders
+    });
+  } catch (error) {
+    console.error("Error fetching customer orders:", error);
+    res.status(500).json({ message: 'Server error fetching orders' });
+  }
+};
+
+// --- Customer Reviews (DB-backed) ---
+exports.getCustomerReviews = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+
+    const [allReviews, myReviews] = await Promise.all([
+      Review.find({})
+        .populate('vendor', 'businessName')
+        .populate('customer', 'name')
+        .sort({ createdAt: -1 }),
+      Review.find({ customer: customerId })
+        .populate('vendor', 'businessName')
+        .sort({ createdAt: -1 })
+    ]);
+
+    const formattedAllReviews = allReviews
+      .filter((review) => review.vendor && review.customer)
+      .map((review) => ({
+        _id: review._id,
+        vendorId: review.vendor._id,
+        vendorName: review.vendor.businessName,
+        customerName: review.customer.name,
+        rating: review.rating,
+        text: review.text,
+        createdAt: review.createdAt,
+        isMine: String(review.customer._id) === String(customerId)
+      }));
+
+    const formattedMyReviews = myReviews
+      .filter((review) => review.vendor)
+      .map((review) => ({
+        _id: review._id,
+        vendorId: review.vendor._id,
+        vendorName: review.vendor.businessName,
+        rating: review.rating,
+        text: review.text,
+        createdAt: review.createdAt
+      }));
+
+    res.status(200).json({
+      allReviews: formattedAllReviews,
+      myReviews: formattedMyReviews
+    });
+  } catch (error) {
+    console.error("Error fetching customer reviews:", error);
+    res.status(500).json({ message: 'Server error fetching reviews' });
+  }
+};
+
+exports.createOrUpdateReview = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+    const { vendorId, rating, text } = req.body;
+
+    if (!vendorId || !rating || !text) {
+      return res.status(400).json({ message: 'vendorId, rating and text are required.' });
+    }
+
+    const parsedRating = Number(rating);
+    if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+      return res.status(400).json({ message: 'rating must be an integer between 1 and 5.' });
+    }
+
+    const cleanedText = String(text).trim();
+    if (!cleanedText) {
+      return res.status(400).json({ message: 'Review text is required.' });
+    }
+
+    const vendor = await VendorProfile.findById(vendorId);
+    if (!vendor) {
+      return res.status(404).json({ message: 'Vendor not found.' });
+    }
+
+    const review = await Review.findOneAndUpdate(
+      { vendor: vendorId, customer: customerId },
+      {
+        vendor: vendorId,
+        customer: customerId,
+        rating: parsedRating,
+        text: cleanedText
+      },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    ).populate('vendor', 'businessName');
+
+    await recomputeVendorRating(vendor._id);
+
+    res.status(200).json({
+      message: 'Review saved successfully.',
+      review: {
+        _id: review._id,
+        vendorId: review.vendor._id,
+        vendorName: review.vendor.businessName,
+        rating: review.rating,
+        text: review.text,
+        createdAt: review.createdAt,
+        updatedAt: review.updatedAt
+      }
+    });
+  } catch (error) {
+    console.error("Error saving review:", error);
+    res.status(500).json({ message: 'Server error saving review' });
+  }
+};
+
+exports.deleteMyReview = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+    const { reviewId } = req.params;
+
+    const review = await Review.findOneAndDelete({ _id: reviewId, customer: customerId });
+    if (!review) {
+      return res.status(404).json({ message: 'Review not found.' });
+    }
+
+    await recomputeVendorRating(review.vendor);
+    res.status(200).json({ message: 'Review deleted successfully.' });
+  } catch (error) {
+    console.error("Error deleting review:", error);
+    res.status(500).json({ message: 'Server error deleting review' });
+  }
+};
 
 // --- Get Customer Payment Details ---
 exports.getCustomerPayments = async (req, res) => {

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'; // Added useEffect and useSt
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, Search, ShoppingCart, Calendar, CreditCard, 
-  MessageSquare, Star, Bell, User, LogOut, Package 
+  Star, Bell, User, LogOut, Package 
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, closeSidebar }) => {
@@ -52,7 +52,6 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
             <SidebarItem to="/dashboard/orders" icon={<Package size={20} />} label="Orders" />
             <SidebarItem to="/dashboard/calendar" icon={<Calendar size={20} />} label="Calendar" />
             <SidebarItem to="/dashboard/payments" icon={<CreditCard size={20} />} label="Payments" />
-            <SidebarItem to="/dashboard/messages" icon={<MessageSquare size={20} />} label="Messages" />
             <SidebarItem to="/dashboard/reviews" icon={<Star size={20} />} label="Reviews" />
             <SidebarItem to="/dashboard/notifications" icon={<Bell size={20} />} label="Notifications" />
             <SidebarItem to="/dashboard/profile" icon={<User size={20} />} label="Profile" />
@@ -91,3 +90,4 @@ const SidebarItem = ({ to, icon, label }) => (
 );
 
 export default Sidebar;
+
