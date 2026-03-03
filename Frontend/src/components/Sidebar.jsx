@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'; // Added useEffect and useSt
 import { NavLink, useNavigate } from 'react-router-dom';
 import { 
   Home, Search, ShoppingCart, Calendar, CreditCard, 
-  Star, Bell, User, LogOut, Package 
+  Star, Bell, User, LogOut, Package, Store 
 } from 'lucide-react';
 
 const Sidebar = ({ isOpen, closeSidebar }) => {
@@ -50,6 +50,7 @@ const Sidebar = ({ isOpen, closeSidebar }) => {
             <SidebarItem to="/dashboard/browse" icon={<Search size={20} />} label="Browse Tiffins" />
             <SidebarItem to="/dashboard/subscriptions" icon={<ShoppingCart size={20} />} label="Subscriptions" />
             <SidebarItem to="/dashboard/orders" icon={<Package size={20} />} label="Orders" />
+            <SidebarItem to="/dashboard/homemade-store" icon={<Store size={20} />} label="Homemade Store" />
             <SidebarItem to="/dashboard/calendar" icon={<Calendar size={20} />} label="Calendar" />
             <SidebarItem to="/dashboard/payments" icon={<CreditCard size={20} />} label="Payments" />
             <SidebarItem to="/dashboard/reviews" icon={<Star size={20} />} label="Reviews" />

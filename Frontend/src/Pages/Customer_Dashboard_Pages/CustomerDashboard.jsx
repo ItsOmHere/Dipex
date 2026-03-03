@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   ShoppingCart, Package, TrendingUp, Clock, Star, 
-  Calendar, AlertTriangle, ChefHat, XCircle, CheckCircle, ChevronRight, Info, Bell
+  Calendar, AlertTriangle, ChefHat, XCircle, CheckCircle, ChevronRight, Info, Bell, Store
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -228,6 +228,7 @@ const tickerStyles = `
           <QuickActionBtn onClick={() => navigate('calendar')} icon={<Calendar size={24} />} label="My Calendar" />
           <QuickActionBtn onClick={() => navigate('/dashboard/orders')} icon={<Package size={24} />} label="Track Orders" />
           <QuickActionBtn onClick={() => navigate('reviews')} icon={<Star size={24} />} label="Write a Review" />
+          <QuickActionBtn onClick={() => navigate('/dashboard/homemade-store')} icon={<Store size={24} />} label="Homemade Store" />
         </div>
       </div>
 

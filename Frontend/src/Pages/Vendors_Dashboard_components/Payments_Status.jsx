@@ -4,6 +4,7 @@ import {
   CheckCircle, Calendar, X, Download, Share2, IndianRupee, Loader2
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { jsPDF } from 'jspdf';
 
 const AllCustomers = () => {
   const Navigate = useNavigate();
@@ -71,6 +72,76 @@ const AllCustomers = () => {
   const handleViewReceipt = (student) => {
     setSelectedStudent(student);
     setShowReceipt(true);
+  };
+
+  const handleDownloadReceipt = (student) => {
+    if (!student) return;
+
+    const doc = new jsPDF();
+    doc.setFontSize(22);
+    doc.setTextColor(234, 88, 12);
+    doc.text('MealMitra Vendor Receipt', 105, 20, null, null, 'center');
+
+    doc.setDrawColor(220, 220, 220);
+    doc.line(20, 28, 190, 28);
+
+    doc.setFontSize(12);
+    doc.setTextColor(60, 60, 60);
+    doc.text('Student Name:', 20, 45);
+    doc.text(String(student.name || 'N/A'), 70, 45);
+
+    doc.text('Hostel / Room:', 20, 55);
+    doc.text(String(student.hostel || 'N/A'), 70, 55);
+
+    doc.text('Plan Type:', 20, 65);
+    doc.text(String(student.plan || 'N/A'), 70, 65);
+
+    doc.text('Date & Time:', 20, 75);
+    doc.text(String(student.date || 'N/A'), 70, 75);
+
+    doc.text('Payment Method:', 20, 85);
+    doc.text(String(student.method || 'N/A'), 70, 85);
+
+    doc.setDrawColor(220, 220, 220);
+    doc.line(20, 95, 190, 95);
+
+    doc.setFontSize(16);
+    doc.setTextColor(0, 0, 0);
+    doc.text('TOTAL RECEIVED:', 20, 110);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Rs. ${student.amount ?? 0}`, 75, 110);
+
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(130, 130, 130);
+    doc.text('Generated from MealMitra Vendor Dashboard', 105, 140, null, null, 'center');
+
+    const fileName = `MealMitra_Vendor_Receipt_${String(student.name || 'student').replace(/\s+/g, '_')}.pdf`;
+    doc.save(fileName);
+  };
+
+  const handleShareReceipt = async (student) => {
+    if (!student) return;
+    const shareText = `MealMitra Receipt\nStudent: ${student.name}\nAmount: Rs. ${student.amount}\nDate: ${student.date}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: 'MealMitra Receipt',
+          text: shareText
+        });
+      } catch {
+        // Intentionally ignore share cancel errors.
+      }
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(shareText);
+      alert('Receipt summary copied to clipboard.');
+    } catch {
+      alert('Unable to share on this device.');
+    }
   };
 
   // Search Filtering
@@ -264,8 +335,18 @@ const AllCustomers = () => {
               </div>
 
               <div className="mt-8 grid grid-cols-2 gap-4">
-                <button className="flex items-center justify-center gap-2 py-3 border border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition-colors"><Download size={18} /> Download</button>
-                <button className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"><Share2 size={18} /> Share</button>
+                <button
+                  onClick={() => handleDownloadReceipt(selectedStudent)}
+                  className="flex items-center justify-center gap-2 py-3 border border-gray-200 rounded-xl font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                >
+                  <Download size={18} /> Download
+                </button>
+                <button
+                  onClick={() => handleShareReceipt(selectedStudent)}
+                  className="flex items-center justify-center gap-2 py-3 bg-green-600 text-white rounded-xl font-semibold hover:bg-green-700 transition-colors"
+                >
+                  <Share2 size={18} /> Share
+                </button>
               </div>
             </div>
             

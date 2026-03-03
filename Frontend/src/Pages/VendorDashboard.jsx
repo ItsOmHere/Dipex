@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, IndianRupee, ChefHat, ClipboardList, Star, Calendar, UserPlus, MapPin,ArrowRight,
   Megaphone, PauseCircle, PhoneCall, Home,
-  CheckCircle, Loader ,Settings
+  CheckCircle, Loader ,Settings, Store, ShoppingBag
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -143,6 +143,15 @@ const VendorDashboard = () => {
             subtext={vendorRatingSubtext}
             icon={<Star size={24} className="text-yellow-500 fill-yellow-500" />}
             color="bg-yellow-100"
+          />
+        </button>
+        <button onClick={() => navigate('/homemade-orders')} className="text-left w-full">
+          <StatsCard
+            title="Homemade Orders"
+            value={dashboardData?.stats?.homemadeOrders || "0"}
+            subtext={`${dashboardData?.stats?.homemadePendingOrders || 0} pending`}
+            icon={<ShoppingBag size={24} className="text-emerald-600" />}
+            color="bg-emerald-100"
           />
         </button>
       </div>
@@ -292,6 +301,14 @@ const VendorDashboard = () => {
             <button onClick={() => navigate('/menu_management')} className="p-4 bg-white border border-gray-200 rounded-xl hover:border-orange-400 hover:shadow-md transition-all group flex flex-col items-center gap-2">
               <div className="w-10 h-10 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform"><Megaphone size={20} /></div>
               <span className="text-xs font-semibold text-gray-600">Announce</span>
+            </button>
+            <button onClick={() => navigate('/Add')} className="p-4 bg-white border border-gray-200 rounded-xl hover:border-orange-400 hover:shadow-md transition-all group flex flex-col items-center gap-2">
+              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform"><Store size={20} /></div>
+              <span className="text-xs font-semibold text-gray-600">Homemade</span>
+            </button>
+            <button onClick={() => navigate('/homemade-orders')} className="p-4 bg-white border border-gray-200 rounded-xl hover:border-orange-400 hover:shadow-md transition-all group flex flex-col items-center gap-2">
+              <div className="w-10 h-10 bg-teal-50 text-teal-600 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform"><ShoppingBag size={20} /></div>
+              <span className="text-xs font-semibold text-gray-600">Orders</span>
             </button>
             
             {/* REQUESTS BUTTON */}

@@ -19,6 +19,7 @@ import PaymentsPage from './Pages/Customer_Dashboard_Pages/PaymentsPage.jsx'
 import ReviewsPage from './Pages/Customer_Dashboard_Pages/ReviewsPage.jsx'
 import NotificationsPage from './Pages/Customer_Dashboard_Pages/NotificationsPage.jsx'
 import ProfilePage from './Pages/Customer_Dashboard_Pages/ProfilePage.jsx'
+import HomemadeStorePage from './Pages/Customer_Dashboard_Pages/HomemadeStorePage.jsx'
 
 // --- Vendor Dashboard Pages ---
 import VendorDashboard from './Pages/VendorDashboard.jsx'
@@ -30,6 +31,7 @@ import LeaveManagement from './Pages/Vendors_Dashboard_components/LeaveManagemen
 import LocationSummary from './Pages/Vendors_Dashboard_components/LocationSummary.jsx'
 import CustomerDirectory from './Pages/Vendors_Dashboard_components/CustomerDirectory.jsx'
 import AddExtraProduct from './Pages/Vendors_Dashboard_components/AddExtraProduct.jsx'
+import HomemadeOrdersPage from './Pages/Vendors_Dashboard_components/HomemadeOrdersPage.jsx'
 import Analytics from './Pages/Vendors_Dashboard_components/Analytics.jsx'
 
 // --- Security ---
@@ -62,6 +64,7 @@ const App = () => {
             <Route path="browse" element={<BrowseTiffinsPage />} />
             <Route path="subscriptions" element={<SubscriptionsPage />} />
             <Route path="orders" element={<OrdersPage />} />
+            <Route path="homemade-store" element={<HomemadeStorePage />} />
             <Route path="calendar" element={<HolidayCalendarPage />} />
             <Route path="payments" element={<PaymentsPage />} />
             <Route path="reviews" element={<ReviewsPage />} />
@@ -84,6 +87,7 @@ const App = () => {
           <Route path="/locations" element={<LocationSummary />} /> 
           <Route path="/CustomerDirectory" element={<CustomerDirectory/>} />
           <Route path="/Add" element={<AddExtraProduct/>} />
+          <Route path="/homemade-orders" element={<HomemadeOrdersPage/>} />
           <Route path="/analytics" element={<Analytics/>}/>
            <Route path="/vendor-profile" element={<VendorProfilePage/>}/>
         </Route>

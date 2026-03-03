@@ -75,7 +75,7 @@ const Students = () => {
         
         {/* --- Header --- */}
         <div className="flex items-center gap-4">
-          <button onClick={() => navigate("/dashboard")} className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
+          <button onClick={() => navigate("/Ven_Dashboard")} className="p-2 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 transition-colors">
             <ArrowLeft size={20} className="text-gray-600" />
           </button>
           <div>

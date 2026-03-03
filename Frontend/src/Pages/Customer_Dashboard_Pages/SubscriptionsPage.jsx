@@ -26,29 +26,28 @@ const SubscriptionsPage = () => {
     // Assume backend provides sub.skippedDates = ['2026-03-08', '2026-03-09']
     const skippedDaysCount = sub.skippedDates ? sub.skippedDates.length : 0;
     
-    // Total days the subscription will span = Base Plan + Holidays
-    const totalSpan = baseDuration + skippedDaysCount;
-
     const startDate = new Date(sub.startDate || sub.updatedAt || sub.createdAt);
-    
-    // Calculate the NEW Extended End Date
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + totalSpan);
+    const fallbackEndDate = new Date(startDate);
+    fallbackEndDate.setDate(fallbackEndDate.getDate() + baseDuration + skippedDaysCount);
+    const endDate = sub.endDate ? new Date(sub.endDate) : fallbackEndDate;
 
     const today = new Date();
     
     // Calculate difference in days between today and the new extended end date
     const diffTime = endDate.getTime() - today.getTime();
     const daysLeftOverall = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    // Ensure we don't go below 0 or above the total span
-    const safeDaysLeft = Math.max(0, Math.min(daysLeftOverall, totalSpan));
-    const progressPercentage = ((totalSpan - safeDaysLeft) / totalSpan) * 100;
+
+    const calendarSpan = Math.max(
+      1,
+      Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
+    );
+    const safeDaysLeft = Math.max(0, daysLeftOverall);
+    const progressPercentage = Math.min(100, Math.max(0, ((calendarSpan - safeDaysLeft) / calendarSpan) * 100));
 
     return { 
       startDate, 
-      endDate, // This is now dynamically extended!
-      totalDays: baseDuration, // What they originally paid for
+      endDate,
+      totalDays: calendarSpan,
       daysLeft: safeDaysLeft, // How many calendar days until it expires
       progressPercentage,
       isExpiringSoon: safeDaysLeft > 0 && safeDaysLeft <= 3,
