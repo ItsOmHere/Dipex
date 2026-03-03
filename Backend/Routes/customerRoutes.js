@@ -15,8 +15,12 @@ router.get('/vendors/:id', authMiddleware, customerController.getVendorById);
 router.post('/subscribe', authMiddleware, customerController.createSubscriptionRequest);
 // GET /api/customer/subscriptions
 router.get('/subscriptions', authMiddleware, customerController.getMySubscriptions);
+router.get('/subscribed-weekly-menus', authMiddleware, customerController.getSubscribedWeeklyMenus);
 // GET /api/customer/orders
 router.get('/orders', authMiddleware, customerController.getMyOrders);
+router.get('/homemade-items', authMiddleware, customerController.getHomemadeProducts);
+router.post('/homemade-orders', authMiddleware, customerController.placeHomemadeOrder);
+router.get('/homemade-orders', authMiddleware, customerController.getMyHomemadeOrders);
 
 router.put('/subscriptions/:id/holidays', authMiddleware, customerController.updateHolidays);
 

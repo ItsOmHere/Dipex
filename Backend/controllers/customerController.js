@@ -4,8 +4,9 @@ const DailyMenu = require('../models/DailyMenu');
 const Announcement = require('../models/Announcement');
 const VendorProfile = require('../models/VendorProfile');
 const Review = require('../models/Review');
-
-const ONE_DAY_MS = 24 * 60 * 60 * 1000;
+const HomemadeItem = require('../models/HomemadeItem');
+const HomemadeOrder = require('../models/HomemadeOrder');
+const HomemadeStockLog = require('../models/HomemadeStockLog');
 
 const normalizeDateKey = (value) => {
   if (!value) return null;
@@ -18,6 +19,36 @@ const parseDateKeyAsLocal = (dateKey) => {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day, 0, 0, 0, 0);
 };
+
+const getWeekdayName = (date = new Date()) => {
+  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  return days[date.getDay()];
+};
+
+const buildTodaysMenuFromWeekly = (weeklyMenu) => {
+  const dayName = getWeekdayName(new Date());
+  const dayMenu = weeklyMenu?.[dayName] || {};
+  const lunchItems = String(dayMenu.lunch || '').trim();
+  const dinnerItems = String(dayMenu.dinner || '').trim();
+
+  if (!lunchItems && !dinnerItems) return null;
+
+  return {
+    day: dayName,
+    lunch: { time: '12:30 PM', items: lunchItems || 'No lunch menu set.' },
+    dinner: dinnerItems ? { time: '8:00 PM', items: dinnerItems } : null
+  };
+};
+
+const defaultWeeklyMenu = () => ({
+  Monday: { lunch: '', dinner: '' },
+  Tuesday: { lunch: '', dinner: '' },
+  Wednesday: { lunch: '', dinner: '' },
+  Thursday: { lunch: '', dinner: '' },
+  Friday: { lunch: '', dinner: '' },
+  Saturday: { lunch: '', dinner: '' },
+  Sunday: { lunch: '', dinner: '' }
+});
 
 const recomputeVendorRating = async (vendorId) => {
   const result = await Review.aggregate([
@@ -155,15 +186,15 @@ exports.updateHolidays = async (req, res) => {
     // Normalize to YYYY-MM-DD and deduplicate.
     const normalizedDates = [...new Set(skippedDates.map(normalizeDateKey).filter(Boolean))].sort();
 
-    // Strict 24-hour rule from "right now". Dates closer than 24h are ignored.
-    const now = Date.now();
+    // Allow leave for today and future dates. Only past dates are ignored.
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
     const validDates = [];
     const ignoredDates = [];
 
     normalizedDates.forEach((dateKey) => {
       const targetDate = parseDateKeyAsLocal(dateKey);
-      const isAtLeast24HoursAway = (targetDate.getTime() - now) >= ONE_DAY_MS;
-      if (isAtLeast24HoursAway) {
+      if (targetDate.getTime() >= todayStart.getTime()) {
         validDates.push(dateKey);
       } else {
         ignoredDates.push(dateKey);
@@ -175,7 +206,7 @@ exports.updateHolidays = async (req, res) => {
 
     res.status(200).json({ 
       message: ignoredDates.length
-        ? "Holidays updated. Some dates were not saved because they are less than 24 hours away."
+        ? "Holidays updated. Some past dates were not saved."
         : "Holidays updated successfully!",
       subscription: updatedSubscription,
       ignoredDates
@@ -250,6 +281,7 @@ exports.getDashboardData = async (req, res) => {
 
     let todaysMenu = null;
     let announcements = [];
+    let weeklyMenus = [];
 
     // 3. If they have a subscription, check what that vendor is cooking today
     if (activeSubscription) {
@@ -262,6 +294,11 @@ exports.getDashboardData = async (req, res) => {
         date: { $gte: today }
       });
 
+      const weeklyMenuFromVendor = activeSubscription.vendor?.weeklyMenu || defaultWeeklyMenu();
+      if (!todaysMenu) {
+        todaysMenu = buildTodaysMenuFromWeekly(weeklyMenuFromVendor);
+      }
+
       announcements = await Announcement.find({
         vendorId: activeSubscription.vendor._id
       })
@@ -269,11 +306,26 @@ exports.getDashboardData = async (req, res) => {
       .limit(5);
     }
 
+    const activeSubscriptions = await Subscription.find({
+      customer: customerId,
+      status: 'active'
+    }).populate('vendor', 'businessName weeklyMenu');
+
+    weeklyMenus = activeSubscriptions
+      .filter((sub) => sub.vendor)
+      .map((sub) => ({
+        subscriptionId: sub._id,
+        vendorId: sub.vendor._id,
+        vendorName: sub.vendor.businessName || 'Vendor',
+        weeklyMenu: sub.vendor.weeklyMenu || defaultWeeklyMenu()
+      }));
+
     // 4. Send it all back to React in one neat package
     res.status(200).json({
       user: customer,
       subscription: activeSubscription || null,
       todaysMenu: todaysMenu || null,
+      weeklyMenus,
       announcements,
       stats: {
         activeSubscriptions: activeSubscriptionsCount,
@@ -376,6 +428,30 @@ exports.getMySubscriptions = async (req, res) => {
   }
 };
 
+exports.getSubscribedWeeklyMenus = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+    const activeSubscriptions = await Subscription.find({
+      customer: customerId,
+      status: 'active'
+    }).populate('vendor', 'businessName weeklyMenu');
+
+    const menus = activeSubscriptions
+      .filter((sub) => sub.vendor)
+      .map((sub) => ({
+        subscriptionId: sub._id,
+        vendorId: sub.vendor._id,
+        vendorName: sub.vendor.businessName || 'Vendor',
+        weeklyMenu: sub.vendor.weeklyMenu || defaultWeeklyMenu()
+      }));
+
+    res.status(200).json({ menus });
+  } catch (error) {
+    console.error('Error fetching subscribed weekly menus:', error);
+    res.status(500).json({ message: 'Server error fetching weekly menus' });
+  }
+};
+
 // --- Get My Orders (derived from customer subscriptions) ---
 exports.getMyOrders = async (req, res) => {
   try {
@@ -443,6 +519,136 @@ exports.getMyOrders = async (req, res) => {
   } catch (error) {
     console.error("Error fetching customer orders:", error);
     res.status(500).json({ message: 'Server error fetching orders' });
+  }
+};
+
+// --- Homemade products marketplace for customers ---
+exports.getHomemadeProducts = async (req, res) => {
+  try {
+    const items = await HomemadeItem.find({
+      isActive: true,
+      inStock: true,
+      stockQuantity: { $gt: 0 }
+    })
+      .populate('vendor', 'businessName serviceArea')
+      .sort({ createdAt: -1 });
+
+    const formattedItems = items
+      .filter((item) => item.vendor)
+      .map((item) => ({
+        _id: item._id,
+        name: item.name,
+        category: item.category,
+        description: item.description,
+        imageUrl: item.imageUrl,
+        unit: item.unit,
+        price: item.price,
+        stockQuantity: item.stockQuantity,
+        vendorId: item.vendor._id,
+        vendorName: item.vendor.businessName,
+        serviceArea: item.vendor.serviceArea
+      }));
+
+    res.status(200).json(formattedItems);
+  } catch (error) {
+    console.error("Error fetching homemade products:", error);
+    res.status(500).json({ message: 'Server error fetching homemade products' });
+  }
+};
+
+exports.placeHomemadeOrder = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+    const { itemId, quantity } = req.body;
+
+    if (!itemId) {
+      return res.status(400).json({ message: 'itemId is required.' });
+    }
+
+    const parsedQuantity = Math.max(1, Math.floor(Number(quantity) || 1));
+    const item = await HomemadeItem.findById(itemId);
+    if (!item || !item.isActive || !item.inStock) {
+      return res.status(404).json({ message: 'Item is not available for ordering.' });
+    }
+
+    const previousStock = item.stockQuantity;
+    const updatedItem = await HomemadeItem.findOneAndUpdate(
+      {
+        _id: itemId,
+        isActive: true,
+        inStock: true,
+        stockQuantity: { $gte: parsedQuantity }
+      },
+      { $inc: { stockQuantity: -parsedQuantity } },
+      { new: true }
+    );
+
+    if (!updatedItem) {
+      return res.status(400).json({ message: `Only ${previousStock} item(s) left in stock.` });
+    }
+
+    if (updatedItem.stockQuantity <= 0 || !updatedItem.isActive) {
+      updatedItem.stockQuantity = Math.max(0, updatedItem.stockQuantity);
+      updatedItem.inStock = false;
+      await updatedItem.save();
+    }
+
+    const totalAmount = parsedQuantity * item.price;
+
+    const order = await HomemadeOrder.create({
+      customer: customerId,
+      vendor: item.vendor,
+      item: item._id,
+      itemName: item.name,
+      itemUnit: item.unit,
+      pricePerUnit: item.price,
+      quantity: parsedQuantity,
+      totalAmount
+    });
+
+    await HomemadeStockLog.create({
+      vendor: item.vendor,
+      item: item._id,
+      order: order._id,
+      action: 'order_placed',
+      quantityChange: -parsedQuantity,
+      previousStock,
+      newStock: updatedItem.stockQuantity,
+      note: `Order placed by customer ${customerId}`
+    });
+
+    res.status(201).json({
+      message: 'Order placed successfully.',
+      order
+    });
+  } catch (error) {
+    console.error("Error placing homemade order:", error);
+    res.status(500).json({ message: 'Server error placing homemade order' });
+  }
+};
+
+exports.getMyHomemadeOrders = async (req, res) => {
+  try {
+    const customerId = req.user.userId || req.user.id;
+    const orders = await HomemadeOrder.find({ customer: customerId })
+      .populate('vendor', 'businessName')
+      .sort({ createdAt: -1 });
+
+    const formattedOrders = orders.map((order) => ({
+      _id: order._id,
+      itemName: order.itemName,
+      itemUnit: order.itemUnit,
+      quantity: order.quantity,
+      totalAmount: order.totalAmount,
+      status: order.status,
+      vendorName: order.vendor?.businessName || 'Unknown Vendor',
+      createdAt: order.createdAt
+    }));
+
+    res.status(200).json(formattedOrders);
+  } catch (error) {
+    console.error("Error fetching homemade orders:", error);
+    res.status(500).json({ message: 'Server error fetching homemade orders' });
   }
 };
 
@@ -597,8 +803,9 @@ exports.getCustomerPayments = async (req, res) => {
     const totalSpan = baseDuration + skippedDaysCount;
 
     const startDate = new Date(activeSub.startDate || activeSub.createdAt);
-    const endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + totalSpan);
+    const fallbackEndDate = new Date(startDate);
+    fallbackEndDate.setDate(fallbackEndDate.getDate() + totalSpan);
+    const endDate = activeSub.endDate ? new Date(activeSub.endDate) : fallbackEndDate;
 
     const diffTime = endDate.getTime() - today.getTime();
     const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
